@@ -251,11 +251,15 @@ class Flow(on.Edge):
                 "Using the investment object the nominal_value"
                 " has to be set to None."
             )
+        # TODO:
+        # this error message probably needs to be removed after the implementation
+        # of the NonconvexInvestmentFlow class
         if self.investment and self.nonconvex:
-            raise ValueError(
-                "Investment flows cannot be combined with "
-                + "nonconvex flows!"
-            )
+            pass
+            # raise ValueError(
+            #     "Investment flows cannot be combined with "
+            #     + "nonconvex flows!"
+            # )
 
         infinite_error_msg = (
             "{} must be a finite value. Passing an infinite "
