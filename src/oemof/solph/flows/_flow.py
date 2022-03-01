@@ -252,8 +252,8 @@ class Flow(on.Edge):
                 " has to be set to None."
             )
         # TODO:
-        # this error message probably needs to be removed after the implementation
-        # of the NonconvexInvestmentFlow class
+        # this error message probably needs to be removed after
+        # the implementation of the NonconvexInvestmentFlow class
         if self.investment and self.nonconvex:
             pass
             # raise ValueError(
