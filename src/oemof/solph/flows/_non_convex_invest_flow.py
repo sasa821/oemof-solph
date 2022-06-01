@@ -42,9 +42,6 @@ class NonConvexInvestFlow(Flow):
         Costs associated with a start of the flow (representing a unit).
     shutdown_costs : numeric (iterable or scalar)
         Costs associated with the shutdown of the flow (representing a unit).
-    activity_costs : numeric (iterable or scalar)
-        Costs associated with the active operation of the flow, independently
-        from the actual output.
     minimum_uptime : numeric (1 or positive integer)
         Minimum time that a flow must be greater then its minimum flow after
         startup. Be aware that minimum up and downtimes can contradict each
@@ -128,12 +125,6 @@ class NonConvexInvestFlowBlock(SimpleBlock):
     MIN_FLOWS
         A subset of set NONCONVEX_FLOWS with the attribute `min`
         being not None in the first timestep.
-    ACTIVITYCOSTFLOWS
-        A subset of set NONCONVEX_FLOWS with the attribute
-        `activity_costs` being not None.
-    INACTIVITYCOSTFLOWS
-        A subset of set NONCONVEX_FLOWS with the attribute
-        `inactivity_costs` being not None.
     STARTUPFLOWS
         A subset of set NONCONVEX_FLOWS with the attribute
         `maximum_startups` or `startup_costs`
@@ -174,7 +165,7 @@ class NonConvexInvestFlowBlock(SimpleBlock):
     Status variable (binary) `om.NonConvexInvestmentFlowBlock.status`:
         Variable indicating if flow is >= 0 indexed by FLOWS
 
-    * :math: `new_param(i,o,t)` (non-negative real number)
+    * :math: `invest_non_convex(i,o,t)` (non-negative real number)
         new paramater representing the multiplication of
         `P_{invest}` and status(i,o,t)`used for the constraints
         on the minimum and maximum flow constraints.
@@ -315,13 +306,13 @@ class NonConvexInvestFlowBlock(SimpleBlock):
 
     Minimum flow constraint `om.NonConvexInvestmentFlowBlock.min[i,o,t]`
         .. math::
-            flow(i, o, t) \geq min(i, o, t) \cdot new_param(i, o, t), \\
+            flow(i, o, t) \geq min(i, o, t) \cdot invest_non_convex(i, o, t), \\
             \forall t \in \textrm{TIMESTEPS}, \\
             \forall (i, o) \in \textrm{NONCONVEX\_INVESTMENT\_FLOWS}.
 
     Maximum flow constraint `om.NonConvexInvestmentFlowBlock.max[i,o,t]`
         .. math::
-            flow(i, o, t) \leq max(i, o, t) new_param(i, o, t), \\
+            flow(i, o, t) \leq max(i, o, t) invest_non_convex(i, o, t), \\
             \forall t \in \textrm{TIMESTEPS}, \\
             \forall (i, o) \in \textrm{NONCONVEX\_INVESTMENT\_FLOWS}.
 
@@ -350,16 +341,6 @@ class NonConvexInvestFlowBlock(SimpleBlock):
         .. math::
             \sum_{i, o \in SHUTDOWNFLOWS} \sum_t shutdown(i, o, t) \
             \cdot shutdown\_costs(i, o)
-
-    If `nonconvex.activity_costs` is set by the user:
-        .. math::
-            \sum_{i, o \in ACTIVITYCOSTFLOWS} \sum_t status(i, o, t) \
-            \cdot activity\_costs(i, o)
-
-    If `nonconvex.inactivity_costs` is set by the user:
-        .. math::
-            \sum_{i, o \in INACTIVITYCOSTFLOWS} \sum_t (1 - status(i, o, t)) \
-            \cdot inactivity\_costs(i, o)
 
     If `nonconvex.positive_gradient["costs"]` is set by the user:
         .. math::
@@ -466,21 +447,6 @@ class NonConvexInvestFlowBlock(SimpleBlock):
             ]
         )
 
-        self.ACTIVITYCOSTFLOWS = Set(
-            initialize=[
-                (g[0], g[1])
-                for g in group
-                if g[2].nonconvex.activity_costs[0] is not None
-            ]
-        )
-
-        self.INACTIVITYCOSTFLOWS = Set(
-            initialize=[
-                (g[0], g[1])
-                for g in group
-                if g[2].nonconvex.inactivity_costs[0] is not None
-            ]
-        )
 
         self.NEGATIVE_GRADIENT_FLOWS = Set(
             initialize=[
@@ -513,6 +479,7 @@ class NonConvexInvestFlowBlock(SimpleBlock):
 
         # invest_status can be deleted (assumed to be always true)
         # to increase the optimization speed
+
         self.invest_status = Var(self.NON_CONVEX_INVEST_FLOWS, within=Binary)
 
         # create status variable for a nonconvex investment flow
@@ -846,8 +813,6 @@ class NonConvexInvestFlowBlock(SimpleBlock):
 
         startup_costs = 0
         shutdown_costs = 0
-        activity_costs = 0
-        inactivity_costs = 0
         gradient_costs = 0
         investment_costs = 0
 
@@ -871,37 +836,10 @@ class NonConvexInvestFlowBlock(SimpleBlock):
                     )
             self.shutdown_costs = Expression(expr=shutdown_costs)
 
-        if self.ACTIVITYCOSTFLOWS:
-            for i, o in self.ACTIVITYCOSTFLOWS:
-                if m.flows[i, o].nonconvex.activity_costs[0] is not None:
-                    for t in m.TIMESTEPS:
-                        activity_costs += (
-                            self.new_param[i, o, t]
-                            * m.objective_weighting[t]
-                            * m.flows[i, o].nonconvex.activity_costs[t]
-                        )
 
-            self.activity_costs = Expression(expr=activity_costs)
-
-        if self.INACTIVITYCOSTFLOWS:
-            for i, o in self.INACTIVITYCOSTFLOWS:
-                if m.flows[i, o].nonconvex.inactivity_costs[0] is not None:
-                    inactivity_costs += sum(
-                        (1 - self.status[i, o, t])
-                        * m.flows[i, o].nonconvex.inactivity_costs[t]
-                        for t in m.TIMESTEPS
-                    )
-
-            self.inactivity_costs = Expression(expr=inactivity_costs)
-
-        # for i, o in self.CONVEX_INVESTFLOWS:
-        #     investment_costs += (
-        #         self.invest[i, o] * m.flows[i, o].investment.ep_costs
-        #     )
         for i, o in self.NON_CONVEX_INVEST_FLOWS:
             investment_costs += (
                 self.invest[i, o] * m.flows[i, o].investment.ep_costs
-                # + m.flows[i, o].investment.offset
                 + self.invest_status[i, o] * m.flows[i, o].investment.offset
             )
 
@@ -910,8 +848,6 @@ class NonConvexInvestFlowBlock(SimpleBlock):
         return (
             startup_costs
             + shutdown_costs
-            + activity_costs
-            + inactivity_costs
             + gradient_costs
             + investment_costs
         )
