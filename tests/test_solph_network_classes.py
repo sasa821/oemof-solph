@@ -79,16 +79,17 @@ def test_wrong_combination_of_options():
 def test_allowed_combination_of_options_for_flow():
     try:
         solph.flows.Flow(
-            investment=solph.Investment(), nonconvex=solph.NonConvex(), allow_nonconvex_investment=True
+            investment=solph.Investment(),
+            nonconvex=solph.NonConvex(),
+            allow_nonconvex_investment=True,
         )
     except ValueError:
         pytest.fail()
 
+
 def test_allowed_combination_of_options_for_nonconvex_invest_flow():
     try:
-        solph.flows.NonConvexInvestFlow(
-            investment=solph.Investment()
-        )
+        solph.flows.NonConvexInvestFlow(investment=solph.Investment())
     except ValueError:
         pytest.fail()
 

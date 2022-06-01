@@ -100,7 +100,8 @@ class Flow(on.Edge):
         will be used instead of
         :class:`FlowBlock <oemof.solph.blocks.FlowBlock>`.
     allow_nonconvex_investment: :bool:
-        If set to True, then the combinaison of nonconvex and investment flows is possible
+        If set to True, then the combinaison of nonconvex and investment flows
+        is possible
 
     Notes
     -----
@@ -168,7 +169,7 @@ class Flow(on.Edge):
             "variable_costs": 0,
             "positive_gradient": {"ub": None},
             "negative_gradient": {"ub": None},
-            "allow_nonconvex_investment": False
+            "allow_nonconvex_investment": False,
         }
         need_nominal_value = [
             "fix",
@@ -231,7 +232,9 @@ class Flow(on.Edge):
                     )
                     raise AttributeError(msg.format(gradient_dict))
 
-        for attribute in set(scalars + sequences + dictionaries + booleans + keys):
+        for attribute in set(
+            scalars + sequences + dictionaries + booleans + keys
+        ):
             value = kwargs.get(attribute, defaults.get(attribute))
             if attribute in dictionaries:
                 setattr(

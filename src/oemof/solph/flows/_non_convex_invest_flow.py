@@ -113,7 +113,9 @@ class NonConvexInvestFlow(Flow):
             negative_gradient=negative_gradient,
         )
         # inside kwargs there is "investment", so flow
-        super().__init__(nonconvex=nonconvex, allow_nonconvex_investment=True, **kwargs)
+        super().__init__(
+            nonconvex=nonconvex, allow_nonconvex_investment=True, **kwargs
+        )
 
 
 class NonConvexInvestFlowBlock(SimpleBlock):
@@ -307,7 +309,7 @@ class NonConvexInvestFlowBlock(SimpleBlock):
 
     Minimum flow constraint `om.NonConvexInvestmentFlowBlock.min[i,o,t]`
         .. math::
-            flow(i, o, t) \geq min(i, o, t) \cdot invest_non_convex(i, o, t), \\
+            flow(i, o, t) \geq min(i, o, t) \cdot invest_non_convex(i, o, t),\\
             \forall t \in \textrm{TIMESTEPS}, \\
             \forall (i, o) \in \textrm{NONCONVEX\_INVESTMENT\_FLOWS}.
 
@@ -318,8 +320,8 @@ class NonConvexInvestFlowBlock(SimpleBlock):
             \forall (i, o) \in \textrm{NONCONVEX\_INVESTMENT\_FLOWS}.
 
     Additional constraints that must be used because the new
-    parameter `invest_non_convex(i,o,t)` was introduced to deal with non-linearity
-    of the minimum and maximum flow constraints.
+    parameter `invest_non_convex(i,o,t)` was introduced to deal with
+    non-linearity of the minimum and maximum flow constraints.
         .. math::
         invest_non_convex(i,o,t) \leq status(i,o,t) \cdot P_{invest, max}
 
@@ -448,7 +450,6 @@ class NonConvexInvestFlowBlock(SimpleBlock):
             ]
         )
 
-
         self.NEGATIVE_GRADIENT_FLOWS = Set(
             initialize=[
                 (g[0], g[1])
@@ -510,7 +511,8 @@ class NonConvexInvestFlowBlock(SimpleBlock):
         # the linearizing the problem.
         # invest_non_convex represents the multiplication of a binary (status)
         # and a continous (invest) variable
-        # self.invest_non_convex[i, o, t] = self.status[i, o, t] * self.invest[i, o]
+        # self.invest_non_convex[i, o, t] = self.status[i, o, t]
+        # * self.invest[i, o]
         # z = x * y, where x is a binary variable (in our case status)
         # and y is a continuous variable (in our case invest)
         self.invest_non_convex = Var(
@@ -776,13 +778,14 @@ class NonConvexInvestFlowBlock(SimpleBlock):
         # z = x * y, where x is a binary variable (in our case status)
         # and y is a continuous variable (in our case invest).
         # We define M as the upper bound of y (in our case investment.maximum)
-        # In order to linearize x*y which is non linear, the following three constraints are needed
-        # NOTE these constraints are only needed for cbc solver as Gurobi handles multiplication
-        # of binary and continuous variables automatically
+        # In order to linearize x*y which is non linear, the following three
+        # constraints are needed
+        # These constraints are only needed for cbc solver as Gurobi handles
+        # multiplication of binary and continuous variables automatically
 
         def _linearization_rule_invest_non_convex_one(block, i, o, t):
             """Rule definition for the linearization of the new parameter.
-                :math:`xM \ge z`
+            :math:`xM \\ge z`
 
             """
             expr = (
@@ -792,32 +795,36 @@ class NonConvexInvestFlowBlock(SimpleBlock):
             return expr
 
         self.linearization_one = Constraint(
-            self.MIN_FLOWS, m.TIMESTEPS, rule=_linearization_rule_invest_non_convex_one
+            self.MIN_FLOWS,
+            m.TIMESTEPS,
+            rule=_linearization_rule_invest_non_convex_one,
         )
 
         def _linearization_rule_invest_non_convex_two(block, i, o, t):
             """Rule definition for the linearization of the new parameter.
 
-                :math:`y \ge z`
+            :math:`y \\ge z`
             """
             expr = self.invest[i, o] >= self.invest_non_convex[i, o, t]
             return expr
 
         self.linearization_two = Constraint(
-            self.MIN_FLOWS, m.TIMESTEPS, rule=_linearization_rule_invest_non_convex_two
+            self.MIN_FLOWS,
+            m.TIMESTEPS,
+            rule=_linearization_rule_invest_non_convex_two,
         )
 
         def _linearization_rule_invest_non_convex_three(block, i, o, t):
             """Rule definition for the linearization of the new parameter.
 
-                :math:`z \ge y - (1-x) M`
+            :math:`z \\ge y - (1-x) M`
 
-                when  :math:`x = 1`, then in combination with linearization rule 2
-                :math:`z` is forced to be equal to :math:`y`
+            when  :math:`x = 1`, then in combination with linearization rule 2
+            :math:`z` is forced to be equal to :math:`y`
 
-                when  :math:`x = 1`, then in combination with linearization rule 1
-                :math:`z` is forced to be smaller or equal to 0 but since :math:`z` is defined as
-                 a non-negative value it is forced to be equal to 0
+            when  :math:`x = 1`, then in combination with linearization rule 1
+            :math:`z` is forced to be smaller or equal to 0 but since :math:`z`
+            is defined as a non-negative value it is forced to be equal to 0
             """
             expr = (
                 self.invest[i, o]
@@ -827,7 +834,9 @@ class NonConvexInvestFlowBlock(SimpleBlock):
             return expr
 
         self.linearization_three = Constraint(
-            self.MIN_FLOWS, m.TIMESTEPS, rule=_linearization_rule_invest_non_convex_three
+            self.MIN_FLOWS,
+            m.TIMESTEPS,
+            rule=_linearization_rule_invest_non_convex_three,
         )
 
     # ################### OBJECTIVE FUNCTION #######################
@@ -873,8 +882,5 @@ class NonConvexInvestFlowBlock(SimpleBlock):
         self.investment_costs = Expression(expr=investment_costs)
 
         return (
-            startup_costs
-            + shutdown_costs
-            + gradient_costs
-            + investment_costs
+            startup_costs + shutdown_costs + gradient_costs + investment_costs
         )
