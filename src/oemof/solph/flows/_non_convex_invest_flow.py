@@ -112,7 +112,8 @@ class NonConvexInvestFlow(Flow):
             positive_gradient=positive_gradient,
             negative_gradient=negative_gradient,
         )
-        super().__init__(nonconvex=nonconvex, **kwargs)
+        # inside kwargs there is "investment", so flow
+        super().__init__(nonconvex=nonconvex, allow_nonconvex_investment=True, **kwargs)
 
 
 class NonConvexInvestFlowBlock(SimpleBlock):

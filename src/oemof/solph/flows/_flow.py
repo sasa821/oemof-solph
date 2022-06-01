@@ -99,8 +99,8 @@ class Flow(on.Edge):
         :class:`NonConvexFlowBlock <oemof.solph.blocks.NonConvexFlowBlock>`
         will be used instead of
         :class:`FlowBlock <oemof.solph.blocks.FlowBlock>`.
-        Note: at the moment this does not work if the investment attribute is
-        set .
+    allow_nonconvex_investment: :bool:
+        If set to True, then the combinaison of nonconvex and investment flows is possible
 
     Notes
     -----
@@ -163,10 +163,12 @@ class Flow(on.Edge):
         ]
         sequences = ["fix", "variable_costs", "min", "max"]
         dictionaries = ["positive_gradient", "negative_gradient"]
+        booleans = ["allow_nonconvex_investment"]
         defaults = {
             "variable_costs": 0,
             "positive_gradient": {"ub": None},
             "negative_gradient": {"ub": None},
+            "allow_nonconvex_investment": False
         }
         need_nominal_value = [
             "fix",
@@ -229,7 +231,7 @@ class Flow(on.Edge):
                     )
                     raise AttributeError(msg.format(gradient_dict))
 
-        for attribute in set(scalars + sequences + dictionaries + keys):
+        for attribute in set(scalars + sequences + dictionaries + booleans + keys):
             value = kwargs.get(attribute, defaults.get(attribute))
             if attribute in dictionaries:
                 setattr(
@@ -254,12 +256,12 @@ class Flow(on.Edge):
         # TODO:
         # this error message probably needs to be removed after
         # the implementation of the NonconvexInvestmentFlow class
-        if self.investment and self.nonconvex:
-            pass
-            # raise ValueError(
-            #     "Investment flows cannot be combined with "
-            #     + "nonconvex flows!"
-            # )
+        if self.allow_nonconvex_investment is False:
+            if self.investment and self.nonconvex:
+                raise ValueError(
+                    "Investment flows cannot be combined with "
+                    + "nonconvex flows!"
+                )
 
         infinite_error_msg = (
             "{} must be a finite value. Passing an infinite "
