@@ -317,16 +317,16 @@ class NonConvexInvestFlowBlock(SimpleBlock):
             \forall (i, o) \in \textrm{NONCONVEX\_INVESTMENT\_FLOWS}.
 
     Additional constraints that must be used because the new
-    parameter `new_param(i,o,t)` was introduced to deal with non-linearity
+    parameter `invest_non_convex(i,o,t)` was introduced to deal with non-linearity
     of the minimum and maximum flow constraints.
         .. math::
-        new_param(i,o,t) \leq status(i,o,t) \cdot P_{invest, max}
+        invest_non_convex(i,o,t) \leq status(i,o,t) \cdot P_{invest, max}
 
         .. math::
-            new_param(i,o,t) \leq P_{invest}
+            invest_non_convex(i,o,t) \leq P_{invest}
 
         .. math::
-            new_param(i,o,t) \geq
+            invest_non_convex(i,o,t) \geq
             P_{invest} - (1 - status(i,o,t)) \cdot P_{invest, max}
 
 
@@ -504,12 +504,15 @@ class NonConvexInvestFlowBlock(SimpleBlock):
                 self.NEGATIVE_GRADIENT_FLOWS, m.TIMESTEPS
             )
 
-        # Create a new parameter called new_param which is used for
+        # TODO this is new
+        # Create a new parameter called invest_non_convex which is used for
         # the linearizing the problem.
-        # new_param represents the multiplication of a binary (status)
+        # invest_non_convex represents the multiplication of a binary (status)
         # and a continous (invest) variable
-        # self.new_param[i, o, t] = self.status[i, o, t] * self.invest[i, o]
-        self.new_param = Var(
+        # self.invest_non_convex[i, o, t] = self.status[i, o, t] * self.invest[i, o]
+        # z = x * y, where x is a binary variable (in our case status)
+        # and y is a continuous variable (in our case invest)
+        self.invest_non_convex = Var(
             self.MIN_FLOWS, m.TIMESTEPS, within=NonNegativeReals
         )
 
@@ -748,7 +751,7 @@ class NonConvexInvestFlowBlock(SimpleBlock):
         def _minimum_flow_rule(block, i, o, t):
             """Rule definition for MILP minimum flow constraints."""
             expr = (
-                self.new_param[i, o, t] * m.flows[i, o].min[t]
+                self.invest_non_convex[i, o, t] * m.flows[i, o].min[t]
                 <= m.flow[i, o, t]
             )
             return expr
@@ -760,7 +763,7 @@ class NonConvexInvestFlowBlock(SimpleBlock):
         def _maximum_flow_rule(block, i, o, t):
             """Rule definition for MILP maximum flow constraints."""
             expr = (
-                self.new_param[i, o, t] * m.flows[i, o].max[t]
+                self.invest_non_convex[i, o, t] * m.flows[i, o].max[t]
                 >= m.flow[i, o, t]
             )
             return expr
@@ -769,38 +772,61 @@ class NonConvexInvestFlowBlock(SimpleBlock):
             self.MIN_FLOWS, m.TIMESTEPS, rule=_maximum_flow_rule
         )
 
-        def _linearization_new_param_one(block, i, o, t):
-            """Rule definition for the linearization of the new parameter."""
+        # z = x * y, where x is a binary variable (in our case status)
+        # and y is a continuous variable (in our case invest).
+        # We define M as the upper bound of y (in our case investment.maximum)
+        # In order to linearize x*y which is non linear, the following three constraints are needed
+        # NOTE these constraints are only needed for cbc solver as Gurobi handles multiplication
+        # of binary and continuous variables automatically
+
+        def _linearization_rule_invest_non_convex_one(block, i, o, t):
+            """Rule definition for the linearization of the new parameter.
+                :math:`xM \ge z`
+
+            """
             expr = (
                 self.status[i, o, t] * m.flows[i, o].investment.maximum
-                >= self.new_param[i, o, t]
+                >= self.invest_non_convex[i, o, t]
             )
             return expr
 
         self.linearization_one = Constraint(
-            self.MIN_FLOWS, m.TIMESTEPS, rule=_linearization_new_param_one
+            self.MIN_FLOWS, m.TIMESTEPS, rule=_linearization_rule_invest_non_convex_one
         )
 
-        def _linearization_new_param_two(block, i, o, t):
-            """Rule definition for the linearization of the new parameter."""
-            expr = self.invest[i, o] >= self.new_param[i, o, t]
+        def _linearization_rule_invest_non_convex_two(block, i, o, t):
+            """Rule definition for the linearization of the new parameter.
+
+                :math:`y \ge z`
+            """
+            expr = self.invest[i, o] >= self.invest_non_convex[i, o, t]
             return expr
 
         self.linearization_two = Constraint(
-            self.MIN_FLOWS, m.TIMESTEPS, rule=_linearization_new_param_two
+            self.MIN_FLOWS, m.TIMESTEPS, rule=_linearization_rule_invest_non_convex_two
         )
 
-        def _linearization_new_param_three(block, i, o, t):
-            """Rule definition for the linearization of the new parameter."""
+        def _linearization_rule_invest_non_convex_three(block, i, o, t):
+            """Rule definition for the linearization of the new parameter.
+
+                :math:`z \ge y - (1-x) M`
+
+                when  :math:`x = 1`, then in combination with linearization rule 2
+                :math:`z` is forced to be equal to :math:`y`
+
+                when  :math:`x = 1`, then in combination with linearization rule 1
+                :math:`z` is forced to be smaller or equal to 0 but since :math:`z` is defined as
+                 a non-negative value it is forced to be equal to 0
+            """
             expr = (
                 self.invest[i, o]
                 - (1 - self.status[i, o, t]) * m.flows[i, o].investment.maximum
-                <= self.new_param[i, o, t]
+                <= self.invest_non_convex[i, o, t]
             )
             return expr
 
         self.linearization_three = Constraint(
-            self.MIN_FLOWS, m.TIMESTEPS, rule=_linearization_new_param_three
+            self.MIN_FLOWS, m.TIMESTEPS, rule=_linearization_rule_invest_non_convex_three
         )
 
     # ################### OBJECTIVE FUNCTION #######################
