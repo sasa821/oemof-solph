@@ -384,18 +384,6 @@ class NonConvexInvestFlowBlock(SimpleBlock):
             initialize=[(g[0], g[1]) for g in group if g[2].fix[0] is None]
         )
 
-        self.SUMMED_MAX_INVESTFLOWS = Set(
-            initialize=[
-                (g[0], g[1]) for g in group if g[2].summed_max is not None
-            ]
-        )
-
-        self.SUMMED_MIN_INVESTFLOWS = Set(
-            initialize=[
-                (g[0], g[1]) for g in group if g[2].summed_min is not None
-            ]
-        )
-
         # nonconvex-related sets
         self.NON_CONVEX_INVEST_FLOWS = Set(
             initialize=[(g[0], g[1]) for g in group]
@@ -559,37 +547,6 @@ class NonConvexInvestFlowBlock(SimpleBlock):
 
         self.fixed = Constraint(
             self.FIXED_INVESTFLOWS, m.TIMESTEPS, rule=_investflow_fixed_rule
-        )
-
-        def _summed_max_investflow_rule(block, i, o):
-            """Rule definition for build action of max. sum flow constraint
-            in investment case.
-            """
-            expr = sum(
-                m.flow[i, o, t] * m.timeincrement[t] for t in m.TIMESTEPS
-            ) <= m.flows[i, o].summed_max * (
-                self.invest[i, o] + m.flows[i, o].investment.existing
-            )
-            return expr
-
-        self.summed_max = Constraint(
-            self.SUMMED_MAX_INVESTFLOWS, rule=_summed_max_investflow_rule
-        )
-
-        def _summed_min_investflow_rule(block, i, o):
-            """Rule definition for build action of min. sum flow constraint
-            in investment case.
-            """
-            expr = sum(
-                m.flow[i, o, t] * m.timeincrement[t] for t in m.TIMESTEPS
-            ) >= (
-                (m.flows[i, o].investment.existing + self.invest[i, o])
-                * m.flows[i, o].summed_min
-            )
-            return expr
-
-        self.summed_min = Constraint(
-            self.SUMMED_MIN_INVESTFLOWS, rule=_summed_min_investflow_rule
         )
 
         def _startup_rule(block, i, o, t):
@@ -871,7 +828,6 @@ class NonConvexInvestFlowBlock(SimpleBlock):
                         for t in m.TIMESTEPS
                     )
             self.shutdown_costs = Expression(expr=shutdown_costs)
-
 
         for i, o in self.NON_CONVEX_INVEST_FLOWS:
             investment_costs += (
