@@ -3,24 +3,16 @@
 """
 General description
 -------------------
-This example illustrates a possible combination of solph.Investment and
-solph.NonConvex. Note that both options are added to different
-components of the energy system.
+This example illustrates the NonConvexInvestFlow.
 
 There are the following components:
 
     - demand_heat: heat demand (high in winter, low in summer)
     - fireplace: wood firing, has a minimum heat and
-                 will burn for a minimum time if lit
-    - boiler: gas firing, more flexible but with
-              higher (flexible) cost than wood firing
-    - thermal_collector: solar thermal collector,
-                         size is to be optimized in this example
-                         (high gain in summer, low in winter)
-    - excess_heat: allow for some heat overproduction
-                   (solution would be trivial without,
-                   as the collector size would be given
-                   by the demand in summer)
+                 will burn for a minimum time if lit.
+    - boiler: gas firing, more flexible but still
+              with minimal load and also with
+              higher cost than wood firing
 
 
 Installation requirements
@@ -103,7 +95,9 @@ fireplace = solph.components.Source(
 
 boiler = solph.components.Source(
     label="boiler",
-    outputs={b_heat: solph.flows.Flow(nominal_value=10, variable_costs=0.2)},
+    outputs={b_heat: solph.flows.Flow(
+        nominal_value=10, min=0.3, variable_costs=0.2
+    )},
 )
 
 excess_heat = solph.components.Sink(
